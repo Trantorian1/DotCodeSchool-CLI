@@ -39,28 +39,29 @@ pub struct JsonTestSuite {
 #[derive(Serialize, Deserialize, Debug, Default)]
 pub struct JsonCourse {
     pub version: String,
-    pub course: String,
+    #[serde(rename = "course")]
+    pub name: String,
     pub instructor: String,
     pub course_id: u64,
     pub suites: Vec<JsonTestSuite>,
 }
 
 pub fn load_course(path: &str) -> Result<JsonCourse, ParsingError> {
-    log::info!("Loading course '{path}'");
+    log::debug!("Loading course '{path}'");
 
     let file_contents = std::fs::read_to_string(path)
         .map_err(|_| ParsingError::FileOpenError(path.to_string()))?;
     let json_course = serde_json::from_str::<JsonCourse>(&file_contents)
         .map_err(|err| ParsingError::CourseFmtError(err.to_string()))?;
 
-    log::info!("Course loaded successfully!");
+    log::debug!("Course loaded successfully!");
 
     Ok(json_course)
 }
 
 impl JsonTest {
     pub fn execute(self) -> TestResult {
-        log::info!("Running test: '{}'", self.cmd);
+        log::debug!("Running test: '{}'", self.cmd);
         let command: Vec<&str> = self.cmd.split_whitespace().collect();
 
         let output = std::process::Command::new(command[0])
@@ -73,7 +74,7 @@ impl JsonTest {
             }
         };
 
-        log::info!("Test executed successfully!");
+        log::debug!("Test executed successfully!");
 
         match output.status.success() {
             true => TestResult::Pass(String::from_utf8(output.stdout).unwrap()),

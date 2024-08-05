@@ -1,6 +1,12 @@
+use std::ops::Deref;
+
 use indicatif::ProgressBar;
 
+use colored::Colorize;
+
 use crate::parsing::{load_course, JsonCourse, ParsingError};
+
+const V_1_0: &str = "1.0";
 
 /// Runs all the tests specified in a `tests.json` file.
 ///
@@ -78,14 +84,19 @@ use crate::parsing::{load_course, JsonCourse, ParsingError};
 /// * `course`: deserialized course information.
 pub struct TestRunner {
     progress: ProgressBar,
-    state: TestRunnerState,
+    success: u32,
+    pub state: TestRunnerState,
     course: JsonCourse,
 }
 
+#[derive(Eq, PartialEq)]
 pub enum TestRunnerState {
     Loaded,
-    Running,
-    Finished,
+    NewSuite(usize),
+    NewTest(usize, usize),
+    Failed(String),
+    Passed,
+    Finish,
 }
 
 impl TestRunner {
@@ -99,7 +110,12 @@ impl TestRunner {
 
                 let progress = ProgressBar::new(test_count as u64);
 
-                TestRunner { progress, state: TestRunnerState::Loaded, course }
+                TestRunner {
+                    progress,
+                    success: 0,
+                    state: TestRunnerState::Loaded,
+                    course,
+                }
             }
             Err(e) => {
                 let msg = match e {
@@ -110,18 +126,157 @@ impl TestRunner {
 
                 TestRunner {
                     progress: ProgressBar::new(0),
-                    state: TestRunnerState::Finished,
+                    success: 0,
+                    state: TestRunnerState::Failed(
+                        "could not parse test file".to_string(),
+                    ),
                     course: JsonCourse::default(),
                 }
             }
         }
     }
 
-    fn make_progress(&mut self) -> &Self {
-        match self.state {
-            TestRunnerState::Loaded => todo!(),
-            TestRunnerState::Running => todo!(),
-            TestRunnerState::Finished => self,
+    pub fn run(self) -> Self {
+        let Self { progress, success, state, course } = self;
+
+        match course.version.deref() {
+            V_1_0 => match state {
+                TestRunnerState::Loaded => {
+                    progress.println(format!(
+                        "{}",
+                        "[ DotCodeSchool CLI ]".bold().truecolor(230, 0, 122)
+                    ));
+
+                    progress.println(format!(
+                        "{} by {}",
+                        course.name.to_uppercase().white().bold(),
+                        course.instructor.white().bold()
+                    ));
+
+                    let exercise_count = course
+                        .suites
+                        .iter()
+                        .fold(0, |acc, suite| acc + suite.tests.len());
+                    progress.println(format!(
+                        "\n📒 You have {} exercises left",
+                        exercise_count
+                    ));
+
+                    Self {
+                        progress,
+                        success,
+                        state: TestRunnerState::NewSuite(0),
+                        course,
+                    }
+                }
+                TestRunnerState::NewSuite(index_suite) => {
+                    let suite = &course.suites[index_suite];
+                    progress.println(format!(
+                        "\n{}",
+                        suite.name.deref().to_uppercase().bold().green()
+                    ));
+
+                    Self {
+                        progress,
+                        success,
+                        state: TestRunnerState::NewTest(index_suite, 0),
+                        course,
+                    }
+                }
+                TestRunnerState::NewTest(index_suite, index_test) => {
+                    let suite = &course.suites[index_suite];
+                    let test = &suite.tests[index_test];
+                    progress.println(format!(
+                        "  🧪 Running test {}",
+                        test.name.to_lowercase().bold()
+                    ));
+
+                    // TODO: run test
+                    progress.inc(1);
+
+                    match (
+                        index_suite + 1 < course.suites.len(),
+                        index_test + 1 < suite.tests.len(),
+                    ) {
+                        (_, true) => Self {
+                            progress,
+                            success: success + 1,
+                            state: TestRunnerState::NewTest(
+                                index_suite,
+                                index_test + 1,
+                            ),
+                            course,
+                        },
+                        (true, false) => Self {
+                            progress,
+                            success: success + 1,
+                            state: TestRunnerState::NewSuite(index_suite + 1),
+                            course,
+                        },
+                        (false, false) => Self {
+                            progress,
+                            success: success + 1,
+                            state: TestRunnerState::Passed,
+                            course,
+                        },
+                    }
+                }
+                TestRunnerState::Failed(msg) => {
+                    progress.finish_and_clear();
+                    progress.println(format!("⚠ {}", msg.red().bold()));
+
+                    Self {
+                        progress,
+                        success,
+                        state: TestRunnerState::Finish,
+                        course,
+                    }
+                }
+                TestRunnerState::Passed => {
+                    progress.finish_and_clear();
+                    let exercise_count = course
+                        .suites
+                        .iter()
+                        .fold(0, |acc, suite| acc + suite.tests.len());
+                    let score = format!(
+                        "{:.2}",
+                        success as f64 / exercise_count as f64 * 100f64
+                    );
+
+                    progress.println(format!(
+                        "\n🏁 final score: {}%",
+                        score.green().bold()
+                    ));
+
+                    Self {
+                        progress,
+                        success,
+                        state: TestRunnerState::Finish,
+                        course,
+                    }
+                }
+                TestRunnerState::Finish => Self {
+                    progress,
+                    success,
+                    state: TestRunnerState::Finish,
+                    course,
+                },
+            },
+            _ => {
+                progress.println(format!(
+                    "⚠ Unsupported version {}",
+                    course.version.red().bold()
+                ));
+
+                progress.finish();
+
+                Self {
+                    progress,
+                    success,
+                    state: TestRunnerState::Finish,
+                    course,
+                }
+            }
         }
     }
 }
