@@ -4,6 +4,7 @@ use log::LevelFilter;
 use std::io::Write;
 
 mod parsing;
+mod runner;
 
 fn main() {
     Builder::new()
