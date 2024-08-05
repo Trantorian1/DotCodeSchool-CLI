@@ -60,7 +60,7 @@ pub fn load_course(path: &str) -> Result<JsonCourse, ParsingError> {
 }
 
 impl JsonTest {
-    pub fn execute(self) -> TestResult {
+    pub fn run(&self) -> TestResult {
         log::debug!("Running test: '{}'", self.cmd);
         let command: Vec<&str> = self.cmd.split_whitespace().collect();
 

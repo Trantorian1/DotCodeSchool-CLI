@@ -2,11 +2,16 @@ use std::ops::Deref;
 
 use indicatif::ProgressBar;
 
-use colored::Colorize;
+use colored::{ColoredString, Colorize};
+use lazy_static::lazy_static;
 
-use crate::parsing::{load_course, JsonCourse, ParsingError};
+use crate::parsing::{load_course, JsonCourse, ParsingError, TestResult};
 
 const V_1_0: &str = "1.0";
+
+lazy_static! {
+    static ref OPTIONAL: ColoredString = "(optional)".white().dimmed().italic();
+}
 
 /// Runs all the tests specified in a `tests.json` file.
 ///
@@ -124,13 +129,18 @@ impl TestRunner {
                 };
                 log::error!("{msg}");
 
+                // TODO: deserialization should happen AFTER the version has
+                // been determined
+                let mut course = JsonCourse::default();
+                course.version = V_1_0.to_string();
+
                 TestRunner {
                     progress: ProgressBar::new(0),
                     success: 0,
                     state: TestRunnerState::Failed(
-                        "could not parse test file".to_string(),
+                        format!("could not parse test file").to_string(),
                     ),
-                    course: JsonCourse::default(),
+                    course,
                 }
             }
         }
@@ -171,9 +181,16 @@ impl TestRunner {
                 }
                 TestRunnerState::NewSuite(index_suite) => {
                     let suite = &course.suites[index_suite];
+                    let suite_str =
+                        suite.name.deref().to_uppercase().bold().green();
+
                     progress.println(format!(
-                        "\n{}",
-                        suite.name.deref().to_uppercase().bold().green()
+                        "\n{suite_str} {}",
+                        if suite.optional {
+                            OPTIONAL.clone()
+                        } else {
+                            ColoredString::default()
+                        },
                     ));
 
                     Self {
@@ -186,12 +203,49 @@ impl TestRunner {
                 TestRunnerState::NewTest(index_suite, index_test) => {
                     let suite = &course.suites[index_suite];
                     let test = &suite.tests[index_test];
+                    let test_name = test.name.to_lowercase().bold();
+
                     progress.println(format!(
-                        "  🧪 Running test {}",
-                        test.name.to_lowercase().bold()
+                        "\n  🧪 Running test {test_name} {}",
+                        if test.optional {
+                            OPTIONAL.clone()
+                        } else {
+                            ColoredString::default()
+                        },
                     ));
 
-                    // TODO: run test
+                    let success_increment = match test.run() {
+                        TestResult::Pass(stdout) => {
+                            progress.println(Self::format_output(
+                                &stdout,
+                                &format!("✅ {}", &test.message_on_success),
+                            ));
+
+                            1
+                        }
+                        TestResult::Fail(stderr) => {
+                            progress.println(format!(
+                                "{}",
+                                Self::format_output(
+                                    &stderr,
+                                    &format!("❌ {}", &test.message_on_fail)
+                                )
+                                .red()
+                                .dimmed()
+                            ));
+                            if !test.optional && !suite.optional {
+                                return Self {
+                                    progress,
+                                    success,
+                                    state: TestRunnerState::Failed(format!(
+                                        "Failed test {test_name}"
+                                    )),
+                                    course,
+                                };
+                            }
+                            0
+                        }
+                    };
                     progress.inc(1);
 
                     match (
@@ -200,7 +254,7 @@ impl TestRunner {
                     ) {
                         (_, true) => Self {
                             progress,
-                            success: success + 1,
+                            success: success + success_increment,
                             state: TestRunnerState::NewTest(
                                 index_suite,
                                 index_test + 1,
@@ -209,13 +263,13 @@ impl TestRunner {
                         },
                         (true, false) => Self {
                             progress,
-                            success: success + 1,
+                            success: success + success_increment,
                             state: TestRunnerState::NewSuite(index_suite + 1),
                             course,
                         },
                         (false, false) => Self {
                             progress,
-                            success: success + 1,
+                            success: success + success_increment,
                             state: TestRunnerState::Passed,
                             course,
                         },
@@ -223,7 +277,8 @@ impl TestRunner {
                 }
                 TestRunnerState::Failed(msg) => {
                     progress.finish_and_clear();
-                    progress.println(format!("⚠ {}", msg.red().bold()));
+                    progress
+                        .println(format!("\n⚠ Error: {}", msg.red().bold()));
 
                     Self {
                         progress,
@@ -278,5 +333,10 @@ impl TestRunner {
                 }
             }
         }
+    }
+
+    fn format_output(output: &str, msg: &str) -> String {
+        let output = output.replace("\n", "\n    │");
+        format!("    ╭─[ output ]{output}\n    ╰─[ {msg} ]")
     }
 }

@@ -23,6 +23,19 @@ fn main() {
     let mut test_runner = TestRunner::new("./tests.json");
     while test_runner.state != TestRunnerState::Finish {
         test_runner = test_runner.run();
-        std::thread::sleep(Duration::from_millis(1000));
+        // std::thread::sleep(Duration::from_millis(1000));
+    }
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn foo() {
+        assert_eq!(0, 0);
+    }
+
+    #[test]
+    fn bazz() {
+        assert_eq!(0, 1);
     }
 }
