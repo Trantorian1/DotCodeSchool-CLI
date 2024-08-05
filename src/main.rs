@@ -1,8 +1,7 @@
 use chrono::Local;
 use env_logger::Builder;
-use log::LevelFilter;
 use runner::{TestRunner, TestRunnerState};
-use std::{io::Write, os::unix::thread, time::Duration};
+use std::io::Write;
 
 mod parsing;
 mod runner;
@@ -23,19 +22,22 @@ fn main() {
     let mut test_runner = TestRunner::new("./tests.json");
     while test_runner.state != TestRunnerState::Finish {
         test_runner = test_runner.run();
-        // std::thread::sleep(Duration::from_millis(1000));
     }
 }
 
 #[cfg(test)]
 mod test {
+    use std::time::Duration;
+
     #[test]
     fn foo() {
+        std::thread::sleep(Duration::from_millis(500));
         assert_eq!(0, 0);
     }
 
     #[test]
     fn bazz() {
+        std::thread::sleep(Duration::from_millis(500));
         assert_eq!(0, 1);
     }
 }

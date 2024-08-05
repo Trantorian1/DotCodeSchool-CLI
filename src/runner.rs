@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use indicatif::ProgressBar;
 
-use colored::{ColoredString, Colorize};
+use colored::Colorize;
 use lazy_static::lazy_static;
 
 use crate::parsing::{load_course, JsonCourse, ParsingError, TestResult};
@@ -10,7 +10,10 @@ use crate::parsing::{load_course, JsonCourse, ParsingError, TestResult};
 const V_1_0: &str = "1.0";
 
 lazy_static! {
-    static ref OPTIONAL: ColoredString = "(optional)".white().dimmed().italic();
+    static ref OPTIONAL: String =
+        "(optional)".white().dimmed().italic().to_string();
+    static ref DOTCODESCHOOL: String =
+        "[ DotCodeSchool CLI ]".bold().truecolor(230, 0, 122).to_string();
 }
 
 /// Runs all the tests specified in a `tests.json` file.
@@ -146,16 +149,28 @@ impl TestRunner {
         }
     }
 
+    /// Advances the [TestRunner]'s state machine.
+    ///
+    /// Possible states are:
+    /// - [TestRunnerState::Loaded]: initial state after JSON deserialization.
+    /// - [TestRunnerState::NewSuite]: displays information about the current
+    ///   suite.
+    /// - [TestRunnerState::NewTest]: displays information about the current
+    ///   test.
+    /// - [TestRunnerState::Failed]: a mandatory test did not pass.
+    /// - [TestRunnerState::Passed]: **all** mandatory tests passed.
+    /// - [TestRunnerState::Finish]: finished execution.
+    ///
+    /// TODO: state diagram
     pub fn run(self) -> Self {
-        let Self { progress, success, state, course } = self;
+        let Self { progress, mut success, state, course } = self;
 
         match course.version.deref() {
             V_1_0 => match state {
+                // Genesis state, displays information about the course and the
+                // number of exercises left.
                 TestRunnerState::Loaded => {
-                    progress.println(format!(
-                        "{}",
-                        "[ DotCodeSchool CLI ]".bold().truecolor(230, 0, 122)
-                    ));
+                    progress.println(DOTCODESCHOOL.clone());
 
                     progress.println(format!(
                         "{} by {}",
@@ -179,18 +194,15 @@ impl TestRunner {
                         course,
                     }
                 }
+                // Displays the name of the current suite
                 TestRunnerState::NewSuite(index_suite) => {
                     let suite = &course.suites[index_suite];
-                    let suite_str =
+                    let suite_name =
                         suite.name.deref().to_uppercase().bold().green();
 
                     progress.println(format!(
-                        "\n{suite_str} {}",
-                        if suite.optional {
-                            OPTIONAL.clone()
-                        } else {
-                            ColoredString::default()
-                        },
+                        "\n{suite_name} {}",
+                        if suite.optional { &OPTIONAL } else { "" },
                     ));
 
                     Self {
@@ -200,6 +212,9 @@ impl TestRunner {
                         course,
                     }
                 }
+                // Runs the current test. This state is responsible for exiting
+                // into a Failed state in case a mandatory test
+                // does not pass.
                 TestRunnerState::NewTest(index_suite, index_test) => {
                     let suite = &course.suites[index_suite];
                     let test = &suite.tests[index_test];
@@ -207,32 +222,32 @@ impl TestRunner {
 
                     progress.println(format!(
                         "\n  🧪 Running test {test_name} {}",
-                        if test.optional {
-                            OPTIONAL.clone()
-                        } else {
-                            ColoredString::default()
-                        },
+                        if test.optional { &OPTIONAL } else { "" },
                     ));
 
-                    let success_increment = match test.run() {
+                    progress.inc(1);
+
+                    // Testing happens HERE
+                    match test.run() {
                         TestResult::Pass(stdout) => {
                             progress.println(Self::format_output(
                                 &stdout,
                                 &format!("✅ {}", &test.message_on_success),
                             ));
 
-                            1
+                            success += 1;
                         }
                         TestResult::Fail(stderr) => {
-                            progress.println(format!(
-                                "{}",
+                            progress.println(
                                 Self::format_output(
                                     &stderr,
-                                    &format!("❌ {}", &test.message_on_fail)
+                                    &format!("❌ {}", &test.message_on_fail),
                                 )
                                 .red()
                                 .dimmed()
-                            ));
+                                .to_string(),
+                            );
+
                             if !test.optional && !suite.optional {
                                 return Self {
                                     progress,
@@ -243,18 +258,18 @@ impl TestRunner {
                                     course,
                                 };
                             }
-                            0
                         }
                     };
-                    progress.inc(1);
 
+                    // Moves on to the next text, the next suite, or marks the
+                    // tests as Passed
                     match (
                         index_suite + 1 < course.suites.len(),
                         index_test + 1 < suite.tests.len(),
                     ) {
                         (_, true) => Self {
                             progress,
-                            success: success + success_increment,
+                            success,
                             state: TestRunnerState::NewTest(
                                 index_suite,
                                 index_test + 1,
@@ -263,18 +278,22 @@ impl TestRunner {
                         },
                         (true, false) => Self {
                             progress,
-                            success: success + success_increment,
+                            success,
                             state: TestRunnerState::NewSuite(index_suite + 1),
                             course,
                         },
                         (false, false) => Self {
                             progress,
-                            success: success + success_increment,
+                            success,
                             state: TestRunnerState::Passed,
                             course,
                         },
                     }
                 }
+                // A mandatory test failed. Displays a custom error message as
+                // defined in the `message_on_fail` field of a
+                // Test JSON object. This state can also be used for general
+                // error logging.
                 TestRunnerState::Failed(msg) => {
                     progress.finish_and_clear();
                     progress
@@ -287,6 +306,11 @@ impl TestRunner {
                         course,
                     }
                 }
+                // ALL mandatory tests passed. Displays the success rate across
+                // all tests. It is not important how low that
+                // rate is, as long as all mandatory tests pass,
+                // and simply serves as an indication of progress for the
+                // student.
                 TestRunnerState::Passed => {
                     progress.finish_and_clear();
                     let exercise_count = course
@@ -310,6 +334,7 @@ impl TestRunner {
                         course,
                     }
                 }
+                // Exit state, does nothing when called.
                 TestRunnerState::Finish => Self {
                     progress,
                     success,
@@ -317,6 +342,7 @@ impl TestRunner {
                     course,
                 },
             },
+            // An invalid `tests.json` version has been provided
             _ => {
                 progress.println(format!(
                     "⚠ Unsupported version {}",
@@ -335,6 +361,18 @@ impl TestRunner {
         }
     }
 
+    /// Formats tests `stderr` and `stdout` output.
+    ///
+    /// Format is as follows:
+    ///
+    /// ```bash
+    /// ╭─[ output ]
+    /// │ {output}
+    /// ╰─[ {msg} ]
+    /// ```
+    ///
+    /// * `output`: test output.
+    /// * `msg`: custom message to display after the output.
     fn format_output(output: &str, msg: &str) -> String {
         let output = output.replace("\n", "\n    │");
         format!("    ╭─[ output ]{output}\n    ╰─[ {msg} ]")

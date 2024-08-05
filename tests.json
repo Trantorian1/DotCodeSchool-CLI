@@ -1,17 +1,44 @@
 {
 	"version": "1.0",
-	"course": "Course name",
-	"instructor": "Instructor name",
+	"course": "Dummy Course",
+	"instructor": "Trantorian",
 	"course_id": 123,
 	"suites": [
 		{
-			"name": "Suite name",
+			"name": "Dummy Suite",
 			"optional": false,
 			"tests": [
 				{
-				    "name": "Test name",
+				    "name": "Foo",
 					"optional": false,
-					"cmd": "cargo test test_name",
+					"cmd": "cargo test foo",
+					"message_on_fail": "This test failed, back to the drawing board.",
+					"message_on_success": "This test passed, congrats!"
+				},
+				{
+				    "name": "Bazz",
+					"optional": true,
+					"cmd": "cargo test bazz",
+					"message_on_fail": "This test failed, back to the drawing board.",
+					"message_on_success": "This test passed, congrats!"
+				}
+		    ]
+		},
+		{
+			"name": "Dummy Suite",
+			"optional": true,
+			"tests": [
+				{
+				    "name": "Foo",
+					"optional": false,
+					"cmd": "cargo test foo",
+					"message_on_fail": "This test failed, back to the drawing board.",
+					"message_on_success": "This test passed, congrats!"
+				},
+				{
+				    "name": "Bazz",
+					"optional": false,
+					"cmd": "cargo test bazz",
 					"message_on_fail": "This test failed, back to the drawing board.",
 					"message_on_success": "This test passed, congrats!"
 				}
