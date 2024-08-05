@@ -3,6 +3,8 @@ use env_logger::Builder;
 use log::LevelFilter;
 use std::io::Write;
 
+mod parsing;
+
 fn main() {
     Builder::new()
         .format(|buf, record| {

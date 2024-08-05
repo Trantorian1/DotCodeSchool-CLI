@@ -1,0 +1,20 @@
+{
+	"course": "Course Name",
+	"instructor": "Instructor Name",
+	"course_id": 123,
+	"suites": [
+		{
+			"name": "Suite Name",
+			"optional": false,
+			"tests": [
+				{
+				    "name": "Test Name",
+					"optional": false,
+					"cmd": "cargo test exercise_name",
+					"message_on_fail": "This test failed, back to the drawing board.",
+					"message_on_success": "This test passed, congrats!"
+				}
+		    ]
+		}
+	]
+}
