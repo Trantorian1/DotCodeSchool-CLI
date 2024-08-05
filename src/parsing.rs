@@ -1,3 +1,9 @@
+//! A module for parsing `tests.json` files.
+//!
+//! This module is concerned with loading `test.json` files, parsing them and
+//! executing providing an implementation for executing tests. The actual
+//! execution is the responsibility of the test [runner].
+
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -14,41 +20,47 @@ pub enum TestResult {
     Fail(String),
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct JsonTest {
-    name: String,
-    optional: bool,
-    cmd: String,
-    message_on_fail: String,
-    message_on_success: String,
+    pub name: String,
+    pub optional: bool,
+    pub cmd: String,
+    pub message_on_fail: String,
+    pub message_on_success: String,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct JsonTestSuite {
-    name: String,
-    optional: bool,
-    tests: Vec<JsonTest>,
+    pub name: String,
+    pub optional: bool,
+    pub tests: Vec<JsonTest>,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
 pub struct JsonCourse {
-    course: String,
-    instructor: String,
-    course_id: u64,
-    suites: Vec<JsonTestSuite>,
+    pub version: String,
+    pub course: String,
+    pub instructor: String,
+    pub course_id: u64,
+    pub suites: Vec<JsonTestSuite>,
 }
 
-fn load_course(path: &str) -> Result<JsonCourse, ParsingError> {
+pub fn load_course(path: &str) -> Result<JsonCourse, ParsingError> {
+    log::info!("Loading course '{path}'");
+
     let file_contents = std::fs::read_to_string(path)
         .map_err(|_| ParsingError::FileOpenError(path.to_string()))?;
     let json_course = serde_json::from_str::<JsonCourse>(&file_contents)
         .map_err(|err| ParsingError::CourseFmtError(err.to_string()))?;
+
+    log::info!("Course loaded successfully!");
 
     Ok(json_course)
 }
 
 impl JsonTest {
     pub fn execute(self) -> TestResult {
+        log::info!("Running test: '{}'", self.cmd);
         let command: Vec<&str> = self.cmd.split_whitespace().collect();
 
         let output = std::process::Command::new(command[0])
@@ -60,6 +72,8 @@ impl JsonTest {
                 return TestResult::Fail("could not execute test".to_string())
             }
         };
+
+        log::info!("Test executed successfully!");
 
         match output.status.success() {
             true => TestResult::Pass(String::from_utf8(output.stdout).unwrap()),
