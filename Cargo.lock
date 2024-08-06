@@ -220,6 +220,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "log",
+ "regex",
  "serde",
  "serde_json",
  "thiserror",

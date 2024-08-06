@@ -1,17 +1,27 @@
-use std::ops::Deref;
+use std::{ops::Deref, thread, time::Duration};
 
 use indicatif::ProgressBar;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 use crate::parsing::{v1::JsonCourseV1, Test, TestResult};
 
-use super::{format_output, Runner, TestRunnerState, DOTCODESCHOOL, OPTIONAL};
+use super::{
+    format_bar, format_output, format_spinner, submodule_name, Runner,
+    TestRunnerState, DOTCODESCHOOL, OPTIONAL,
+};
 
 use colored::Colorize;
 use derive_more::Constructor;
 
-const GIT_SUBMODULE_STATIC: &str = "git submodule status";
-const GIT_SUBMODULE_INIT: &str = "git submodule init";
-const GIT_SUBMODULE_UPDATE: &str = "git submodule update";
+lazy_static! {
+    static ref GIT_SUBMODULE_STATUS: Vec<&'static str> =
+        vec!["git", "submodule", "status"];
+    static ref GIT_SUBMODULE_INIT: Vec<&'static str> =
+        vec!["git", "submodule", "init"];
+    static ref GIT_SUBMODULE_UPDATE: Vec<&'static str> =
+        vec!["git", "submodule", "update"];
+}
 
 /// Runs all the tests specified in a `tests.json` file.
 ///
@@ -126,15 +136,88 @@ impl Runner for TestRunnerV1 {
                 }
             }
             TestRunnerState::Update => {
-                let output = std::process::Command::new()
+                format_spinner(&progress);
 
+                let output = std::process::Command::new("git")
+                    .arg("submodule")
+                    .arg("status")
+                    .output();
+
+                if let Ok(output) = output {
+                    let stdout = String::from_utf8(output.stdout).unwrap();
+                    let lines = stdout.split("\n");
+
+                    for line in lines {
+                        let submodule = submodule_name(&stdout);
+
+                        // Handles uninitialized submodules
+                        if line.starts_with("-") {
+                            progress.set_message(
+                                "Downloading tests"
+                                    .italic()
+                                    .dimmed()
+                                    .to_string(),
+                            );
+
+                            // initialized the submodule
+                            let _ = std::process::Command::new("git")
+                                .arg("submodule")
+                                .arg("update")
+                                .arg("--init")
+                                .arg(&submodule)
+                                .output();
+
+                            thread::sleep(Duration::from_millis(1000));
+                        }
+                    }
+                } else {
+                    progress.println("⚠ Failed to update tests");
+                }
+
+                // This needs to be re-run since downloaded submodules might
+                // still be out of date
+                let output = std::process::Command::new("git")
+                    .arg("submodule")
+                    .arg("status")
+                    .output();
+
+                if let Ok(output) = output {
+                    let stdout = String::from_utf8(output.stdout).unwrap();
+                    let lines = stdout.split("\n");
+
+                    for line in lines {
+                        let submodule = submodule_name(&stdout);
+
+                        // Handles out-of-date submodules
+                        if line.starts_with("+") {
+                            progress.set_message(
+                                "Updating tests".italic().dimmed().to_string(),
+                            );
+
+                            // updates the submodule
+                            // let _ = std::process::Command::new("cd")
+                            //     .arg(&submodule)
+                            //     .output();
+                            //
+                            // let _ = std::process::Command::new("git")
+                            //     .arg("pull")
+                            //     .output();
+
+                            thread::sleep(Duration::from_millis(1000));
+                        }
+                    }
+                } else {
+                    progress.println("⚠ Failed to update tests");
+                }
+
+                format_bar(&progress);
                 Self {
-                progress,
-                success,
-                state: TestRunnerState::NewSuite(0),
-                course,
+                    progress,
+                    success,
+                    state: TestRunnerState::NewSuite(0),
+                    course,
+                }
             }
-            },
             // Displays the name of the current suite
             TestRunnerState::NewSuite(index_suite) => {
                 let suite = &course.suites[index_suite];
