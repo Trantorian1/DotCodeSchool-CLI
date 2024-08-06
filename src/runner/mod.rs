@@ -151,6 +151,7 @@ fn format_bar(progress: &ProgressBar) {
 }
 
 fn submodule_name(stdout: &str) -> String {
+    let regex = Regex::new(r"-[abcdef0123456789]* (?<submodule>\w*)").unwrap();
     let capture = regex.captures(&stdout).map(|c| c["submodule"].to_string());
 
     // extracts the submodule name
