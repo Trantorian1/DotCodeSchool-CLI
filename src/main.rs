@@ -1,6 +1,6 @@
 use chrono::Local;
 use env_logger::Builder;
-use runner::{TestRunner, TestRunnerState};
+use runner::{Runner, RunnerVersion, TestRunnerState};
 use std::io::Write;
 
 mod parsing;
@@ -19,9 +19,9 @@ fn main() {
         })
         .init();
 
-    let mut test_runner = TestRunner::new("./tests.json");
-    while test_runner.state != TestRunnerState::Finish {
-        test_runner = test_runner.run();
+    let mut runner = RunnerVersion::new("./tests.json");
+    while runner.state() != TestRunnerState::Finish {
+        runner = runner.run();
     }
 }
 
