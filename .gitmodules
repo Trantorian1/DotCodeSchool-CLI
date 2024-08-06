@@ -1,0 +1,9 @@
+[submodule ".test"]
+	path = .test
+	url = https://git.dotcodeschool.com/dotcodeschool-cli-tests
+[submodule "src/.test"]
+	path = src/.test
+	url = https://git.dotcodeschool.com/dotcodeschool-cli-tests
+[submodule "tests"]
+	path = tests
+	url = https://git.dotcodeschool.com/dotcodeschool-cli-tests

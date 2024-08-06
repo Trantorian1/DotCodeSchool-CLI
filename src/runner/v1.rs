@@ -9,6 +9,10 @@ use super::{format_output, Runner, TestRunnerState, DOTCODESCHOOL, OPTIONAL};
 use colored::Colorize;
 use derive_more::Constructor;
 
+const GIT_SUBMODULE_STATIC: &str = "git submodule status";
+const GIT_SUBMODULE_INIT: &str = "git submodule init";
+const GIT_SUBMODULE_UPDATE: &str = "git submodule update";
+
 /// Runs all the tests specified in a `tests.json` file.
 ///
 /// Tests are run sequentially in their order of definition. Running tests
@@ -114,14 +118,23 @@ impl Runner for TestRunnerV1 {
                     "\n📒 You have {} exercises left",
                     exercise_count.to_string().bold()
                 ));
-
                 Self {
                     progress,
                     success,
-                    state: TestRunnerState::NewSuite(0),
+                    state: TestRunnerState::Update,
                     course,
                 }
             }
+            TestRunnerState::Update => {
+                let output = std::process::Command::new()
+
+                Self {
+                progress,
+                success,
+                state: TestRunnerState::NewSuite(0),
+                course,
+            }
+            },
             // Displays the name of the current suite
             TestRunnerState::NewSuite(index_suite) => {
                 let suite = &course.suites[index_suite];

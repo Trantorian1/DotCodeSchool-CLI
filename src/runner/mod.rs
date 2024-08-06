@@ -19,6 +19,7 @@ lazy_static! {
 #[derive(Eq, PartialEq, Clone)]
 pub enum TestRunnerState {
     Loaded,
+    Update,
     NewSuite(usize),
     NewTest(usize, usize),
     Failed(String),
