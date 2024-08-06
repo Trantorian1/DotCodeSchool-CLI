@@ -40,6 +40,8 @@ pub trait Runner {
     ///
     /// Possible states are:
     /// - [TestRunnerState::Loaded]: initial state after JSON deserialization.
+    /// - [TestRunnerState::Update]: initializes submodules and looks for test
+    ///   updates.
     /// - [TestRunnerState::NewSuite]: displays information about the current
     ///   suite.
     /// - [TestRunnerState::NewTest]: displays information about the current
@@ -55,6 +57,8 @@ pub trait Runner {
     ///
     /// Possible states are:
     /// - [TestRunnerState::Loaded]: initial state after JSON deserialization.
+    /// - [TestRunnerState::Update]: initializes submodules and looks for test
+    ///   updates.
     /// - [TestRunnerState::NewSuite]: displays information about the current
     ///   suite.
     /// - [TestRunnerState::NewTest]: displays information about the current
@@ -137,7 +141,7 @@ fn format_output(output: &str, msg: &str) -> String {
 
 fn format_spinner(progress: &ProgressBar) {
     progress.set_style(
-        ProgressStyle::with_template("{spinner} {msg} {elapsed_precise}")
+        ProgressStyle::with_template("\n{spinner} {msg} {elapsed_precise}")
             .unwrap(),
     );
     progress.enable_steady_tick(Duration::from_millis(50));

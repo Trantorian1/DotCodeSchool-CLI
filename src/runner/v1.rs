@@ -126,6 +126,10 @@ impl Runner for TestRunnerV1 {
                     course,
                 }
             }
+            // Initializes all submodules and checks for tests updates. This
+            // happens if the `TEST_DIR` submodule is out of date,
+            // in which case it will be pulled. A new commit is then
+            // created which contains the submodule update.
             TestRunnerState::Update => {
                 format_spinner(&progress);
 
