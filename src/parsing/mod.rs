@@ -37,8 +37,9 @@ pub trait Test {
 pub fn load_course(path: &str) -> Result<JsonCourseVersion, ParsingError> {
     log::debug!("Loading course '{path}'");
 
-    let file_contents = std::fs::read_to_string(path)
-        .map_err(|_| ParsingError::FileOpenError(path.to_string()))?;
+    let file_contents = std::fs::read_to_string(path).map_err(|_| {
+        ParsingError::FileOpenError(format!("failed to open file at {path}"))
+    })?;
     let json_raw = serde_json::from_str::<serde_json::Value>(&file_contents)
         .map_err(|err| ParsingError::CourseFmtError(err.to_string()))?;
     let version = json_raw.get("version").ok_or(()).map_err(|_| {
